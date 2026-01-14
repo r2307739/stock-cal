@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股當沖損益計算機 (獲利檔位版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .input-group:hover .btn-delete {
+            opacity: 1;
+        }
+        .btn-delete {
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <div class="card p-6 md:p-8">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-between">
+                <span class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    台股當沖損益計算機 (獲利檔位版)
+                </span>
+            </h1>
+
+            <div class="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
+                <div class="flex items-center">
+                    <label class="text-sm font-medium text-blue-800 mr-2">手續費折扣</label>
+                    <input type="number" id="fee-discount" value="2.8" step="0.1" class="w-20 p-2 border border-blue-200 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                    <span class="ml-1 text-sm text-blue-800">折</span>
+                </div>
+                <button onclick="calculate()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md active:transform active:scale-95">
+                    立即計算
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- 左側：輸入區 -->
+                <div class="lg:col-span-2 space-y-8">
+                    <section>
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-lg font-bold text-gray-700 flex items-center">
+                                <span class="w-2 h-6 bg-blue-600 rounded mr-2"></span>
+                                進場紀錄 (買入/先賣)
+                            </h2>
+                            <button onclick="addRow('in-rows')" class="text-sm bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded-full flex items-center">
+                                + 增加價位
+                            </button>
+                        </div>
+                        <div id="in-rows" class="space-y-2"></div>
+                    </section>
+
+                    <section>
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-lg font-bold text-gray-700 flex items-center">
+                                <span class="w-2 h-6 bg-orange-500 rounded mr-2"></span>
+                                出場紀錄 (預計賣出)
+                            </h2>
+                            <button onclick="addRow('out-rows')" class="text-sm bg-orange-500 hover:bg-orange-600 text-white py-1 px-3 rounded-full flex items-center">
+                                + 增加價位
+                            </button>
+                        </div>
+                        <div id="out-rows" class="space-y-2"></div>
+                        <p class="text-xs text-gray-400 mt-2">* 若只想看獲利檔位參考，出場紀錄可先隨意填寫一個價格。</p>
+                    </section>
+                </div>
+
+                <!-- 右側：結果面板 -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-gray-900 text-white rounded-2xl p-6 shadow-xl">
+                        <h2 class="text-xl font-bold mb-6 border-b border-gray-700 pb-2">結算總覽</h2>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="flex justify-between text-gray-400 text-sm">
+                                <span>均進價 / 總張數</span>
+                                <div class="text-right">
+                                    <span id="summary-in-avg" class="text-white font-mono">0</span>
+                                    <span class="mx-1">/</span>
+                                    <span id="summary-in-vol">0</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-gray-400 text-sm">
+                                <span>均出價 / 總張數</span>
+                                <div class="text-right">
+                                    <span id="summary-out-avg" class="text-white font-mono">0</span>
+                                    <span class="mx-1">/</span>
+                                    <span id="summary-out-vol">0</span>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-gray-700 space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span>手續費 (折後)</span>
+                                    <span id="res-fee">$0</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>證交稅 (0.15%)</span>
+                                    <span id="res-tax">$0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center py-6 bg-gray-800 rounded-xl mb-4">
+                            <p class="text-gray-400 text-xs mb-1 uppercase tracking-wider">預估純利</p>
+                            <p id="res-profit" class="text-4xl font-black text-white">0</p>
+                        </div>
+
+                        <div class="flex items-center justify-between px-2 mb-2">
+                            <span class="text-gray-400 text-sm">預估報酬率</span>
+                            <span id="res-roi" class="text-lg font-bold text-gray-400">0.00%</span>
+                        </div>
+                    </div>
+
+                    <!-- 獲利檔位參考表 -->
+                    <div id="tick-table-container" class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hidden">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clip-rule="evenodd" />
+                            </svg>
+                            損益平衡檔位參考
+                        </h3>
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="text-gray-400 border-b">
+                                    <th class="text-left py-2 font-medium">檔位價格</th>
+                                    <th class="text-right py-2 font-medium">單筆損益</th>
+                                    <th class="text-right py-2 font-medium">結果</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tick-table-body">
+                                <!-- 由 JS 生成 -->
+                            </tbody>
+                        </table>
+                        <p class="text-[10px] text-gray-400 mt-3 text-center">以平均進場價格及總張數計算</p>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="mt-12 text-center text-gray-400 text-xs">
+                © 台股當沖損益計算器 - 內建台股升降單位規則
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        window.onload = () => {
+            addRow('in-rows');
+            addRow('out-rows');
+        };
+
+        function addRow(containerId) {
+            const container = document.getElementById(containerId);
+            const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const div = document.createElement('div');
+            div.id = rowId;
+            div.className = 'input-group flex items-center gap-2 animate-fadeIn';
+            div.innerHTML = `
+                <div class="flex-1 grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="單價" step="0.01" class="price-input w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input type="number" placeholder="張數" step="1" class="vol-input w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <button onclick="removeRow('${rowId}')" class="btn-delete p-2 text-gray-400 hover:text-red-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row && row.parentElement.children.length > 1) {
+                row.remove();
+            }
+        }
+
+        // 台股升降單位規則
+        function getTickSize(price) {
+            if (price < 10) return 0.01;
+            if (price < 50) return 0.05;
+            if (price < 100) return 0.1;
+            if (price < 500) return 0.5;
+            if (price < 1000) return 1;
+            return 5;
+        }
+
+        // 格式化價格（處理浮點數運算誤差）
+        function formatPrice(price) {
+            return parseFloat(price.toFixed(2));
+        }
+
+        function calculate() {
+            const getInputs = (id) => {
+                let items = [];
+                document.getElementById(id).querySelectorAll('.input-group').forEach(row => {
+                    const p = parseFloat(row.querySelector('.price-input').value) || 0;
+                    const v = parseFloat(row.querySelector('.vol-input').value) || 0;
+                    if (p > 0 && v > 0) items.push({ price: p, vol: v });
+                });
+                return items;
+            };
+
+            const inData = getInputs('in-rows');
+            const outData = getInputs('out-rows');
+            const discount = parseFloat(document.getElementById('fee-discount').value) / 10 || 1;
+
+            if (inData.length === 0) return alert("請至少輸入一筆進場價格與張數");
+
+            let inTotalVal = 0, inTotalVol = 0;
+            inData.forEach(d => {
+                inTotalVal += (d.price * d.vol * 1000);
+                inTotalVol += d.vol;
+            });
+
+            let outTotalVal = 0, outTotalVol = 0;
+            outData.forEach(d => {
+                outTotalVal += (d.price * d.vol * 1000);
+                outTotalVol += d.vol;
+            });
+
+            const avgIn = inTotalVal / (inTotalVol * 1000);
+            const avgOut = outTotalVol > 0 ? outTotalVal / (outTotalVol * 1000) : 0;
+
+            document.getElementById('summary-in-avg').innerText = avgIn.toFixed(2);
+            document.getElementById('summary-in-vol').innerText = inTotalVol;
+            document.getElementById('summary-out-avg').innerText = avgOut.toFixed(2);
+            document.getElementById('summary-out-vol').innerText = outTotalVol;
+
+            // 計算當前損益
+            if (outTotalVal > 0) {
+                const feeIn = Math.max(20, Math.floor(inTotalVal * 0.001425 * discount));
+                const feeOut = Math.max(20, Math.floor(outTotalVal * 0.001425 * discount));
+                const tax = Math.floor(outTotalVal * 0.0015);
+                const profit = outTotalVal - inTotalVal - (feeIn + feeOut + tax);
+                const roi = (profit / inTotalVal) * 100;
+
+                document.getElementById('res-fee').innerText = `$${(feeIn + feeOut).toLocaleString()}`;
+                document.getElementById('res-tax').innerText = `$${tax.toLocaleString()}`;
+                const pEl = document.getElementById('res-profit');
+                pEl.innerText = `${profit > 0 ? '+' : ''}${Math.round(profit).toLocaleString()}`;
+                pEl.className = `text-4xl font-black ${profit > 0 ? 'text-red-500' : profit < 0 ? 'text-green-400' : 'text-white'}`;
+                const rEl = document.getElementById('res-roi');
+                rEl.innerText = `${roi.toFixed(2)}%`;
+                rEl.className = `text-lg font-bold ${roi > 0 ? 'text-red-500' : roi < 0 ? 'text-green-400' : 'text-gray-400'}`;
+            }
+
+            // 生成參考檔位表
+            generateTickTable(avgIn, inTotalVol, discount);
+        }
+
+        function generateTickTable(basePrice, totalVol, discount) {
+            const container = document.getElementById('tick-table-container');
+            const tbody = document.getElementById('tick-table-body');
+            tbody.innerHTML = '';
+            container.classList.remove('hidden');
+
+            let ticks = [];
+            let currentPrice = basePrice;
+
+            // 往下 5 檔
+            for(let i=0; i<5; i++) {
+                currentPrice -= getTickSize(currentPrice - 0.001);
+                ticks.unshift(formatPrice(currentPrice));
+            }
+            // 中間（平均價）
+            ticks.push(formatPrice(basePrice));
+            // 往上 10 檔（為了確保能找到獲利點，多算一些）
+            currentPrice = basePrice;
+            for(let i=0; i<10; i++) {
+                currentPrice += getTickSize(currentPrice);
+                ticks.push(formatPrice(currentPrice));
+            }
+
+            // 挑選顯示範圍（平均價周圍）
+            const centerIdx = ticks.indexOf(formatPrice(basePrice));
+            const displayTicks = ticks.slice(Math.max(0, centerIdx - 5), centerIdx + 7);
+
+            displayTicks.forEach(price => {
+                const totalIn = basePrice * totalVol * 1000;
+                const totalOut = price * totalVol * 1000;
+                const feeIn = Math.max(20, Math.floor(totalIn * 0.001425 * discount));
+                const feeOut = Math.max(20, Math.floor(totalOut * 0.001425 * discount));
+                const tax = Math.floor(totalOut * 0.0015);
+                const profit = Math.round(totalOut - totalIn - (feeIn + feeOut + tax));
+
+                const isBase = formatPrice(price) === formatPrice(basePrice);
+                const tr = document.createElement('tr');
+                tr.className = `border-b border-gray-50 ${isBase ? 'bg-yellow-50' : ''}`;
+                
+                let statusBadge = '';
+                if (profit > 0) {
+                    statusBadge = '<span class="text-red-500 font-bold">獲利</span>';
+                } else if (profit < 0) {
+                    statusBadge = '<span class="text-green-600">虧損</span>';
+                } else {
+                    statusBadge = '<span class="text-gray-500">平盤</span>';
+                }
+
+                tr.innerHTML = `
+                    <td class="py-2 font-mono ${isBase ? 'font-bold text-blue-600' : 'text-gray-600'}">
+                        ${price.toFixed(2)} ${isBase ? '<span class="text-[10px] font-normal">(成本)</span>' : ''}
+                    </td>
+                    <td class="text-right py-2 font-mono ${profit >= 0 ? 'text-red-500' : 'text-green-600'}">
+                        ${profit > 0 ? '+' : ''}${profit.toLocaleString()}
+                    </td>
+                    <td class="text-right py-2">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function resetUI() {
+            document.getElementById('res-profit').innerText = '0';
+            document.getElementById('res-profit').className = 'text-4xl font-black text-white';
+            document.getElementById('tick-table-container').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
